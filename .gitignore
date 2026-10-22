@@ -1,0 +1,147 @@
+# ---------------------------------------------------------------------------
+# Operating system noise
+# ---------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ---------------------------------------------------------------------------
+# Editor / IDE state
+# ---------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+*.swn
+*~
+*.bak
+*.orig
+*.rej
+.history/
+*.sublime-project
+*.sublime-workspace
+.zed/
+.fleet/
+
+# ---------------------------------------------------------------------------
+# Node.js
+# ---------------------------------------------------------------------------
+node_modules/
+jspm_packages/
+.pnpm-store/
+.yarn/cache
+.yarn/install-state.gz
+.npm/
+.eslintcache
+node-inspect.log*
+*.tsbuildinfo
+
+# Lockfiles are committed on purpose so installs are reproducible.
+# Do not add package-lock.json, yarn.lock, pnpm-lock.yaml or bun.lockb here.
+
+# ---------------------------------------------------------------------------
+# Environment / secrets
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+secrets/
+credentials/
+service-account*.json
+*_rsa.pem
+*_ed25519.pem
+
+# ---------------------------------------------------------------------------
+# Build output, logs and test artifacts
+# ---------------------------------------------------------------------------
+dist/
+build/
+out/
+coverage/
+.nyc_output/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.html
+*.lcov
+
+# ---------------------------------------------------------------------------
+# Generated protobuf / gRPC code
+# Regenerate locally with protoc / buf; never commit the output.
+# ---------------------------------------------------------------------------
+
+# Node.js (protoc --js_out, protoc --grpc_out, proto-loader-gen-types)
+*_pb.js
+*_pb.d.ts
+*_grpc_pb.js
+*_pb.ts
+generated/
+**/generated/
+
+# Go (protoc-gen-go, protoc-gen-go-grpc)
+*.pb.go
+*_grpc.pb.go
+
+# Python (grpcio-tools)
+*_pb2.py
+*_pb2.pyi
+*_pb2_grpc.py
+*_pb2_grpc.pyi
+
+# C / C++ (protoc --cpp_out)
+*.pb.cc
+*.pb.h
+*.pb.cc.meta
+
+# Java (protoc --java_out, protoc-gen-grpc-java)
+*OuterClass.java
+*Grpc.java
+
+# Descriptor sets and other protoc by-products
+*.pb.bin
+*.protoset
+*.descriptor
+*.desc
+descriptor_set.pb
+
+# ---------------------------------------------------------------------------
+# Protobuf / gRPC tooling
+# ---------------------------------------------------------------------------
+# buf keeps its module cache and local state outside the repo, but plugins
+# and downloaded SDKs may land here.
+.buf/
+buf.work.yaml.bak
+protoc-gen-*
+
+# ---------------------------------------------------------------------------
+# Local scratch space
+# ---------------------------------------------------------------------------
+.scratch/
+tmp/
+temp/
+.cache/
