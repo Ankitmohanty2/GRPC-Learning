@@ -2,7 +2,9 @@
 
 A personal learning space for **gRPC** (Google Remote Procedure Call) — the contract-first RPC framework that pairs a Protocol Buffers IDL with HTTP/2 to give you typed, fast, streaming service calls.
 
-This repository is a notebook: every example is small, self-contained, and written to be read as much as run. The goal is not to ship a production service, but to build an accurate mental model of how gRPC actually works — one concept at a time.
+This repository is my own learning notebook, not a product or a maintained library. Every example is small and self-contained, and the point of each one is that I can explain it afterwards without looking at the code. The goal is an accurate mental model of how gRPC actually works — one concept at a time.
+
+Each step follows the same loop: **read it → build it → break it on purpose → write down what surprised me.** The "write down" part is the one I used to skip, so it gets its own directory.
 
 ---
 
@@ -12,13 +14,15 @@ This repository is a notebook: every example is small, self-contained, and writt
 - [Why gRPC?](#why-grpc)
 - [The four kinds of RPC](#the-four-kinds-of-rpc)
 - [Learning path](#learning-path)
+- [How I work through a step](#how-i-work-through-a-step)
 - [Quick start](#quick-start)
 - [Tooling reference](#tooling-reference)
 - [Core concepts](#core-concepts)
+- [Questions I want to answer](#questions-i-want-to-answer)
 - [Repository layout](#repository-layout)
 - [Troubleshooting](#troubleshooting)
 - [Resources](#resources)
-- [Contributing](#contributing)
+- [Notes for future me](#notes-for-future-me)
 - [License](#license)
 
 ---
@@ -70,21 +74,52 @@ Message ordering is guaranteed within an individual call. In a bidi stream, the 
 
 ## Learning path
 
-Work through these in order. Each step builds on the last.
+Work through these in order. Each step builds on the last, and the status column is my own progress tracker.
 
-| # | Topic | What you learn |
-|---|-------|----------------|
-| 1 | **Hello World** | Define a service, generate code, run a server and client |
-| 2 | **Proto3 basics** | Scalar types, `repeated`, `map`, `oneof`, `optional`, field evolution rules |
-| 3 | **Server streaming** | `returns (stream ...)`, reading a server-sent sequence |
-| 4 | **Client streaming** | `rpc ... (stream ...)`, writing a request sequence |
-| 5 | **Bidirectional streaming** | Read/write concurrency, backpressure, flow control |
-| 6 | **Deadlines & cancellation** | `deadline` option, `DEADLINE_EXCEEDED`, aborting in-flight calls |
-| 7 | **Metadata** | Request/response headers, auth tokens, custom key-value pairs |
-| 8 | **Error handling** | gRPC status codes, `grpc.ServiceError`, rich error details |
-| 9 | **Interceptors** | Cross-cutting middleware on client and server |
-| 10 | **Security** | TLS, per-RPC credentials, mTLS |
-| 11 | **Reflection & tooling** | `grpcurl`, server reflection, `buf` lint and breaking-change detection |
+| # | Topic | What I learn | Status |
+|---|-------|--------------|--------|
+| 1 | **Hello World** | Define a service, generate code, run a server and client | Todo |
+| 2 | **Proto3 basics** | Scalar types, `repeated`, `map`, `oneof`, `optional`, field evolution rules | Todo |
+| 3 | **Server streaming** | `returns (stream ...)`, reading a server-sent sequence | Todo |
+| 4 | **Client streaming** | `rpc ... (stream ...)`, writing a request sequence | Todo |
+| 5 | **Bidirectional streaming** | Read/write concurrency, backpressure, flow control | Todo |
+| 6 | **Deadlines & cancellation** | `deadline` option, `DEADLINE_EXCEEDED`, aborting in-flight calls | Todo |
+| 7 | **Metadata** | Request/response headers, auth tokens, custom key-value pairs | Todo |
+| 8 | **Error handling** | gRPC status codes, `grpc.ServiceError`, rich error details | Todo |
+| 9 | **Interceptors** | Cross-cutting middleware on client and server | Todo |
+| 10 | **Security** | TLS, per-RPC credentials, mTLS | Todo |
+| 11 | **Reflection & tooling** | `grpcurl`, server reflection, `buf` lint and breaking-change detection | Todo |
+
+A step only counts as done when I can answer its questions in [Questions I want to answer](#questions-i-want-to-answer) from memory — not from the code.
+
+## How I work through a step
+
+Every example lives in `examples/<NN>-<topic>/` and follows the same four-part loop.
+
+**1. Read the contract first.** Before writing any JavaScript, read the `.proto` and say out loud what the server is allowed to do. If I can't describe the contract in plain words, the code won't clarify it later.
+
+**2. Build the smallest thing that works.** One service, one method, no extras. The quick start below is the template — copy it, then change it.
+
+**3. Break it on purpose.** This is the part that actually teaches. Every example carries a short "break it" list of things to get wrong on purpose and watch: kill the server mid-call, send a malformed payload, set a 1 ms deadline, call a method that does not exist. The status code and error message that come back go straight into the notes.
+
+**4. Write down what surprised me.** In `notes/<NN>-<topic>.md` — what I expected, what actually happened, and the one thing I would have gotten wrong without running it. This is the artifact that makes the repo worth keeping.
+
+A worked example of the note format:
+
+```markdown
+# 07 - Metadata
+
+## What I expected
+Missing header -> server throws -> client sees INTERNAL.
+
+## What actually happened
+`metadata.get('authorization')` returned `[]`, and `[]` is truthy, so the
+`if (!auth)` guard never fired. The guard threw instead, and the client got
+UNKNOWN (2) rather than UNAUTHENTICATED (16).
+
+## The thing I'd have gotten wrong
+Falsy-checking an array of header values. Now: `auth?.[0]?.startsWith(...)`.
+```
 
 ## Quick start
 
@@ -97,7 +132,12 @@ The examples target **Node.js** with the pure-JavaScript `@grpc/grpc-js` impleme
 
 ### 1. Install the dependencies
 
+The quick start is learning-path step 1, so it lives in `examples/01-hello-world/`. Work there:
+
 ```bash
+mkdir -p examples/01-hello-world/proto examples/01-hello-world/src
+cd examples/01-hello-world
+npm init -y
 npm install @grpc/grpc-js @grpc/proto-loader @grpc/reflection
 ```
 
@@ -109,7 +149,7 @@ npm install @grpc/grpc-js @grpc/proto-loader @grpc/reflection
 
 ### 2. Define the service
 
-Create `proto/helloworld.proto`:
+Create `examples/01-hello-world/proto/helloworld.proto`:
 
 ```proto
 syntax = "proto3";
@@ -137,7 +177,7 @@ Note the field numbers (`= 1`, `= 2`). They are the wire format's identity, not 
 
 ### 3. Write the server
 
-Create `src/server.js`:
+Create `examples/01-hello-world/src/server.js`:
 
 ```js
 const path = require('node:path');
@@ -180,7 +220,7 @@ The `protoLoader.loadSync` options control how protobuf values map to JavaScript
 
 ### 4. Write the client
 
-Create `src/client.js`:
+Create `examples/01-hello-world/src/client.js`:
 
 ```js
 const path = require('node:path');
@@ -214,7 +254,7 @@ client.sayHello({ name }, (err, response) => {
 
 ### 5. Run it
 
-Open two terminals:
+Open two terminals, both inside `examples/01-hello-world/`:
 
 ```bash
 # Terminal 1
@@ -489,13 +529,52 @@ const client = new proto.Greeter('127.0.0.1:50051', grpc.credentials.createInsec
 
 This is the natural place to attach an auth token to every outgoing call without threading it through the call sites.
 
+## Questions I want to answer
+
+These are the questions each example is supposed to make me able to answer. If I cannot answer one from memory, the example is not finished — and if I cannot answer it by reading the code either, that is a gap in the README I should fill in.
+
+**The contract**
+
+- What does the `.proto` file give me that a REST route does not?
+- Where does the contract end and the implementation begin?
+- Why does a unary call look like a function call but travel over HTTP/2?
+
+**Streaming**
+
+- When would I pick server streaming over a paginated unary API?
+- In a bidirectional stream, who decides how fast each side reads?
+- What happens to messages already in flight when the client disconnects?
+
+**Deadlines and errors**
+
+- What does the server see when a deadline passes mid-handler?
+- Which status codes mean "retry" and which mean "do not retry"?
+- Why is `INVALID_ARGUMENT` a client bug while `UNAVAILABLE` is a server problem?
+
+**Wiring**
+
+- How do I attach an auth token to every call without touching every call site?
+- Where do I put logging so it captures each call exactly once?
+- What changes if the same `.proto` is served by a Go backend and called from Node?
+
+**The wire**
+
+- What bytes actually travel for a unary call? (Look at the HTTP/2 frames, not just the protobuf.)
+- How do I turn on message compression, and does it pay off for small messages?
+- What does a deadline look like in the request headers?
+
 ## Repository layout
 
 ```
 GRPC-Learning/
-├── proto/            # .proto contracts, shared across examples
-├── src/              # server and client code
 ├── examples/         # one directory per learning-path step
+│   └── 01-hello-world/
+│       ├── proto/    # the contract for this example
+│       ├── src/      # server and client
+│       └── README.md # what it shows, and how to break it
+├── notes/            # what I learned, in my own words
+│   └── 01-hello-world.md
+├── proto/            # shared contracts, for when an example outgrows one file
 ├── tools/            # helper scripts (codegen, formatting, linting)
 └── README.md
 ```
@@ -503,6 +582,8 @@ GRPC-Learning/
 ### Conventions
 
 - **One `.proto` per example**, in that example's own `proto/` directory — contracts should be readable in isolation.
+- **Every example has a `README.md`** with three parts: what it demonstrates, how to run it, and a "break it" list of deliberate mistakes to try.
+- **Every example has a matching note** in `notes/`, even if it is one line. Especially if it is one line.
 - **Generated code is never committed.** Run the codegen command; the output is git-ignored.
 - **Pin your `google-protobuf` version** in `package.json` if you use static code generation.
 
@@ -543,14 +624,19 @@ You did not register the reflection service, or you are using a server started w
 - [`buf`](https://buf.build/docs) — linting, breaking-change detection, and a protobuf registry
 - [Google API design guide](https://google.aip.dev) — conventions worth following for any RPC API
 
-## Contributing
+## Notes for future me
 
-This is a personal learning repository, but contributions are welcome. If you add an example:
+Things worth remembering when I come back to this repo in six months.
 
-1. Put it in `examples/<NN>-<topic>/` and follow the numbering in the learning path.
-2. Include a short `README.md` in the example directory explaining what it demonstrates and what to look for.
-3. Make sure the example runs from a clean `npm install` — no undocumented global state.
-4. Do not commit generated code.
+- **The contract is the API.** Changing a `.proto` changes the wire format. Adding a field is safe; renumbering a field or reusing a deleted one is not.
+- **Errors are status codes, not exceptions.** `INVALID_ARGUMENT` means my client is wrong. `UNAVAILABLE` means retry. Anything else needs reading.
+- **A missing header is not `undefined`.** `metadata.get()` returns an array, and an empty array is truthy. Use `auth?.[0]?.…`.
+- **A deadline is not a timeout.** The server sees the cancellation too — it should stop working, not just have its response dropped.
+- **`SO_REUSEPORT` is on.** A stale server can share port 50051 with a new one, so "it half works" is usually a leftover process, not a bug in the code.
+- **Generated code is disposable.** If a `.proto` change does not show up, regenerate before debugging anything else.
+- **When something confuses me, it goes in the README.** Fixing it for me is worth less than writing it down so the same confusion never happens twice.
+
+If I extend this repo, the loop stays the same: build it small, break it on purpose, write it down.
 
 ## License
 
