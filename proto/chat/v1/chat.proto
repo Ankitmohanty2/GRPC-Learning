@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package chat.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// A chat message — sent and received in both directions.
+message ChatMessage {
+  string id = 1;
+  string sender = 2;
+  string text = 3;
+  string room = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+// Bidirectional Streaming RPC: both client and server send messages independently.
+// The two streams are independent — the server can write before reading everything,
+// and the client can write before reading everything.
+service ChatService {
+  rpc Chat (stream ChatMessage) returns (stream ChatMessage);
+}

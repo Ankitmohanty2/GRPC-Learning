@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package measurements.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// A single sensor measurement.
+message Measurement {
+  string sensor_id = 1;
+  double value = 2;
+  string unit = 3;
+  google.protobuf.Timestamp recorded_at = 4;
+}
+
+// Summary returned after all measurements have been received.
+message UploadSummary {
+  int32 total_received = 1;
+  int32 total_accepted = 2;
+  int32 total_rejected = 3;
+  double average_value = 4;
+  double min_value = 5;
+  double max_value = 6;
+}
+
+// Client Streaming RPC: the client sends a stream of measurements,
+// and the server responds with a single summary when the stream ends.
+service MeasurementService {
+  rpc UploadMeasurements (stream Measurement) returns (UploadSummary);
+}

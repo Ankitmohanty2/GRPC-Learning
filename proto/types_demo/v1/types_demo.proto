@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package types_demo.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// --------------------------------------------------------------------------
+// This proto file demonstrates every major proto3 feature in one place.
+// It is the companion to Lesson 02: Protocol Buffers.
+// --------------------------------------------------------------------------
+
+// Enum — always start with a zero-value named UNSPECIFIED.
+// The zero value is the default, so "unspecified" makes the default explicit.
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;
+  PRIORITY_MEDIUM = 2;
+  PRIORITY_HIGH = 3;
+  PRIORITY_CRITICAL = 4;
+}
+
+// Nested message — reusable within other messages.
+message Address {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  string zip_code = 4;
+  string country = 5;
+}
+
+// Demonstrates every proto3 field type and feature.
+message TypesShowcase {
+  // --- Scalar types ---
+  string name = 1;          // UTF-8 string
+  int32 age = 2;            // Variable-length encoding, inefficient for negative numbers
+  int64 big_id = 3;         // 64-bit integer (represented as string in JS via longs=String)
+  uint32 count = 4;         // Unsigned 32-bit integer
+  sint32 delta = 5;         // Signed, ZigZag encoding — efficient for negative numbers
+  float score = 6;          // 32-bit IEEE 754
+  double precise_score = 7; // 64-bit IEEE 754
+  bool is_active = 8;       // Boolean
+  bytes avatar = 9;         // Arbitrary byte sequence
+
+  // --- Enum ---
+  Priority priority = 10;
+
+  // --- Nested message ---
+  Address address = 11;
+
+  // --- Repeated field (ordered list) ---
+  repeated string tags = 12;
+
+  // --- Map (unordered key-value pairs) ---
+  map<string, string> metadata = 13;
+
+  // --- Oneof (mutually exclusive fields) ---
+  // At most one of these fields can be set. Setting one clears the other.
+  oneof contact {
+    string email = 14;
+    string phone = 15;
+  }
+
+  // --- Optional (explicit presence tracking) ---
+  // Without `optional`, a zero-value string is indistinguishable from "not set".
+  // With `optional`, you can detect whether the field was explicitly provided.
+  optional string nickname = 16;
+
+  // --- Well-known types ---
+  google.protobuf.Timestamp created_at = 17;
+
+  // --- Reserved fields ---
+  // Prevents reuse of field numbers or names that were removed.
+  // Reusing a deleted field number is a silent, breaking wire-format change.
+  reserved 50, 51, 52 to 55;
+  reserved "old_field", "deprecated_field";
+}
+
+// A simple echo service to demonstrate the types over the wire.
+service TypesDemoService {
+  // Echoes the input back. Use this to inspect how proto3 serializes each type.
+  rpc Echo (TypesShowcase) returns (TypesShowcase);
+}

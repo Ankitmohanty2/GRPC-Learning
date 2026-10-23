@@ -1,0 +1,127 @@
+const grpc = require('@grpc/grpc-js');
+
+const GRPC_STATUS_CATALOG = {
+  [grpc.status.OK]: {
+    code: grpc.status.OK,
+    name: 'OK',
+    httpEquivalent: 200,
+    retryable: false,
+    description: 'Success.',
+  },
+  [grpc.status.CANCELLED]: {
+    code: grpc.status.CANCELLED,
+    name: 'CANCELLED',
+    httpEquivalent: 499,
+    retryable: false,
+    description: 'The operation was cancelled, typically by the caller.',
+  },
+  [grpc.status.UNKNOWN]: {
+    code: grpc.status.UNKNOWN,
+    name: 'UNKNOWN',
+    httpEquivalent: 500,
+    retryable: false,
+    description: 'Unknown error.',
+  },
+  [grpc.status.INVALID_ARGUMENT]: {
+    code: grpc.status.INVALID_ARGUMENT,
+    name: 'INVALID_ARGUMENT',
+    httpEquivalent: 400,
+    retryable: false,
+    description: 'Client specified an invalid argument.',
+  },
+  [grpc.status.DEADLINE_EXCEEDED]: {
+    code: grpc.status.DEADLINE_EXCEEDED,
+    name: 'DEADLINE_EXCEEDED',
+    httpEquivalent: 504,
+    retryable: true,
+    description: 'The deadline expired before the operation could complete.',
+  },
+  [grpc.status.NOT_FOUND]: {
+    code: grpc.status.NOT_FOUND,
+    name: 'NOT_FOUND',
+    httpEquivalent: 404,
+    retryable: false,
+    description: 'Some requested entity was not found.',
+  },
+  [grpc.status.ALREADY_EXISTS]: {
+    code: grpc.status.ALREADY_EXISTS,
+    name: 'ALREADY_EXISTS',
+    httpEquivalent: 409,
+    retryable: false,
+    description: 'The entity already exists.',
+  },
+  [grpc.status.PERMISSION_DENIED]: {
+    code: grpc.status.PERMISSION_DENIED,
+    name: 'PERMISSION_DENIED',
+    httpEquivalent: 403,
+    retryable: false,
+    description: 'The caller does not have permission to execute the operation.',
+  },
+  [grpc.status.RESOURCE_EXHAUSTED]: {
+    code: grpc.status.RESOURCE_EXHAUSTED,
+    name: 'RESOURCE_EXHAUSTED',
+    httpEquivalent: 429,
+    retryable: true,
+    description: 'Some resource has been exhausted.',
+  },
+  [grpc.status.FAILED_PRECONDITION]: {
+    code: grpc.status.FAILED_PRECONDITION,
+    name: 'FAILED_PRECONDITION',
+    httpEquivalent: 400,
+    retryable: false,
+    description: 'System is not in a state required for execution.',
+  },
+  [grpc.status.ABORTED]: {
+    code: grpc.status.ABORTED,
+    name: 'ABORTED',
+    httpEquivalent: 409,
+    retryable: true,
+    description: 'The operation was aborted.',
+  },
+  [grpc.status.OUT_OF_RANGE]: {
+    code: grpc.status.OUT_OF_RANGE,
+    name: 'OUT_OF_RANGE',
+    httpEquivalent: 400,
+    retryable: false,
+    description: 'The operation was attempted past the valid range.',
+  },
+  [grpc.status.UNIMPLEMENTED]: {
+    code: grpc.status.UNIMPLEMENTED,
+    name: 'UNIMPLEMENTED',
+    httpEquivalent: 501,
+    retryable: false,
+    description: 'The operation is not implemented.',
+  },
+  [grpc.status.INTERNAL]: {
+    code: grpc.status.INTERNAL,
+    name: 'INTERNAL',
+    httpEquivalent: 500,
+    retryable: false,
+    description: 'Internal system error.',
+  },
+  [grpc.status.UNAVAILABLE]: {
+    code: grpc.status.UNAVAILABLE,
+    name: 'UNAVAILABLE',
+    httpEquivalent: 503,
+    retryable: true,
+    description: 'The service is currently unavailable.',
+  },
+  [grpc.status.DATA_LOSS]: {
+    code: grpc.status.DATA_LOSS,
+    name: 'DATA_LOSS',
+    httpEquivalent: 500,
+    retryable: false,
+    description: 'Unrecoverable data loss or corruption.',
+  },
+  [grpc.status.UNAUTHENTICATED]: {
+    code: grpc.status.UNAUTHENTICATED,
+    name: 'UNAUTHENTICATED',
+    httpEquivalent: 401,
+    retryable: false,
+    description: 'The request does not have valid authentication credentials.',
+  },
+};
+
+module.exports = {
+  GRPC_STATUS_CATALOG,
+};

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  user-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "-e", "const { startUserService } = require('./lessons/18-microservices/services/user-service'); startUserService(50051, '0.0.0.0');"]
+    ports:
+      - "50051:50051"
+    environment:
+      - NODE_ENV=production
+      - PORT=50051
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+  product-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "-e", "const { startProductService } = require('./lessons/18-microservices/services/product-service'); startProductService(50052, '0.0.0.0');"]
+    ports:
+      - "50052:50052"
+    environment:
+      - NODE_ENV=production
+      - PORT=50052
+      - HOST=0.0.0.0
+    restart: unless-stopped
+
+  order-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: ["node", "-e", "const { startOrderService } = require('./lessons/18-microservices/services/order-service'); startOrderService(50053, '0.0.0.0', 'user-service:50051', 'product-service:50052');"]
+    ports:
+      - "50053:50053"
+    environment:
+      - NODE_ENV=production
+      - PORT=50053
+      - HOST=0.0.0.0
+      - USER_SERVICE_ADDR=user-service:50051
+      - PRODUCT_SERVICE_ADDR=product-service:50052
+    depends_on:
+      - user-service
+      - product-service
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=grpc_user
+      - POSTGRES_PASSWORD=grpc_secret
+      - POSTGRES_DB=grpc_commerce
+    ports:
+      - "5432:5432"
+    restart: unless-stopped

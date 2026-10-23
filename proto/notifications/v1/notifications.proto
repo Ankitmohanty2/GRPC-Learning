@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package notifications.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Notification severity level.
+enum NotificationType {
+  NOTIFICATION_TYPE_UNSPECIFIED = 0;
+  NOTIFICATION_TYPE_INFO = 1;
+  NOTIFICATION_TYPE_WARNING = 2;
+  NOTIFICATION_TYPE_ERROR = 3;
+}
+
+// A single notification event.
+message Notification {
+  string id = 1;
+  string title = 2;
+  string body = 3;
+  NotificationType type = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+// Subscribe to notifications.
+message WatchNotificationsRequest {
+  // User to watch notifications for.
+  string user_id = 1;
+
+  // Optional filter: only receive these types. Empty = all types.
+  repeated NotificationType types = 2;
+}
+
+// Server Streaming RPC: the server sends a continuous stream of notifications.
+// The client sends one request and receives multiple responses over time.
+service NotificationService {
+  rpc WatchNotifications (WatchNotificationsRequest) returns (stream Notification);
+}

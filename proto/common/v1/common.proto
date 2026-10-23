@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package common.v1;
+
+// Pagination request — included in any List RPC request.
+message PageRequest {
+  // Maximum number of items to return. Server may return fewer.
+  int32 page_size = 1;
+
+  // Opaque token from a previous ListResponse. Empty for the first page.
+  string page_token = 2;
+}
+
+// Pagination response — included in any List RPC response.
+message PageResponse {
+  // Token to retrieve the next page. Empty if this is the last page.
+  string next_page_token = 1;
+
+  // Total number of items across all pages (if known).
+  int32 total_count = 2;
+}

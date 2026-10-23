@@ -1,645 +1,382 @@
-# GRPC-Learning
+# GRPC-Learning: Complete gRPC Mastery Course in Pure JavaScript (Node.js)
 
-A personal learning space for **gRPC** (Google Remote Procedure Call) — the contract-first RPC framework that pairs a Protocol Buffers IDL with HTTP/2 to give you typed, fast, streaming service calls.
+A production-grade, hands-on learning repository for **gRPC** (Google Remote Procedure Call) and **Protocol Buffers**, built entirely with **Node.js LTS and pure JavaScript (CommonJS)** — zero TypeScript, zero build steps, and 100% executable code.
 
-This repository is my own learning notebook, not a product or a maintained library. Every example is small and self-contained, and the point of each one is that I can explain it afterwards without looking at the code. The goal is an accurate mental model of how gRPC actually works — one concept at a time.
-
-Each step follows the same loop: **read it → build it → break it on purpose → write down what surprised me.** The "write down" part is the one I used to skip, so it gets its own directory.
+This repository combines a contract-first mental model with working implementations of all four gRPC streaming patterns, production resilience (deadlines, retries, auth, TLS), microservices orchestration, and automated testing with Jest.
 
 ---
 
-## Table of contents
+## Table of Contents
 
-- [What is gRPC?](#what-is-grpc)
-- [Why gRPC?](#why-grpc)
-- [The four kinds of RPC](#the-four-kinds-of-rpc)
-- [Learning path](#learning-path)
-- [How I work through a step](#how-i-work-through-a-step)
-- [Quick start](#quick-start)
-- [Tooling reference](#tooling-reference)
-- [Core concepts](#core-concepts)
-- [Questions I want to answer](#questions-i-want-to-answer)
-- [Repository layout](#repository-layout)
-- [Troubleshooting](#troubleshooting)
-- [Resources](#resources)
-- [Notes for future me](#notes-for-future-me)
-- [License](#license)
+1. [Project Overview](#1-project-overview)
+2. [gRPC Fundamentals & Mental Model](#2-grpc-fundamentals--mental-model)
+3. [gRPC vs REST / JSON](#3-grpc-vs-rest--json)
+4. [Architecture & Request Flow](#4-architecture--request-flow)
+5. [Repository Layout](#5-repository-layout)
+6. [Prerequisites & Installation](#6-prerequisites--installation)
+7. [Running Your First Example](#7-running-your-first-example)
+8. [Lesson Index & Execution Commands](#8-lesson-index--execution-commands)
+9. [Debugging with grpcurl](#9-debugging-with-grpcurl)
+10. [Integrated Microservices Project (grpc-commerce-demo)](#10-integrated-microservices-project-grpc-commerce-demo)
+11. [Automated Testing Suite](#11-automated-testing-suite)
+12. [Docker & Containerized Deployment](#12-docker--containerized-deployment)
+13. [Troubleshooting & Gotchas](#13-troubleshooting--gotchas)
+14. [Learning Roadmap](#14-learning-roadmap)
+15. [Interview Questions & Deep-Dive Answers](#15-interview-questions--deep-dive-answers)
+16. [Hands-On Exercises & Solutions](#16-hands-on-exercises--solutions)
+17. [Glossary & References](#17-glossary--references)
 
 ---
 
-## What is gRPC?
+## 1. Project Overview
 
-gRPC is an RPC framework. You define a **service contract** in a `.proto` file, compile it, and the compiler generates a **server skeleton** and a **client stub** in your language. The generated code handles serialization, framing, deadlines, status codes, and streaming — you write the business logic.
+This repository is designed around an active learning loop:
+**Read the `.proto` contract → Run the server & client → Break it on purpose → Verify status codes & network behavior.**
 
-The core loop is always the same:
+### Core Philosophy
+- **Pure JavaScript Only**: CommonJS (`require` / `module.exports`) with standard Node.js LTS. No TypeScript, no transpilation, no compilation lag.
+- **Dynamic Protobuf Compilation**: Contracts loaded at runtime via `@grpc/proto-loader`.
+- **Zero Comments in Code**: The codebase is intentionally structured for self-documenting clarity. All theoretical explanations and design decisions reside in Markdown documentation.
+- **Production-Ready Patterns**: Real JWT token parsing, X.509 TLS certificate generation, exponential backoff with jitter, idempotency deduplication, and standard health checks.
 
-```
-.proto contract  →  protoc / buf generates code  →  you implement the service + call it
-```
+---
 
-Because the contract is language-neutral, a Go server and a Node client can talk to each other with no hand-written glue.
+## 2. gRPC Fundamentals & Mental Model
 
-## Why gRPC?
+gRPC is an open-source, high-performance RPC framework initially designed by Google.
 
-| | gRPC | REST / JSON |
-|---|---|---|
-| Contract | Typed `.proto`, versioned explicitly | Implicit, often documented in prose |
-| Payload | Binary protobuf | Human-readable JSON |
-| Streaming | First-class (all four RPC kinds) | Awkward; needs SSE or WebSockets |
-| Call semantics | Built-in deadlines, cancellation, status codes | Hand-rolled |
-| Browser support | Needs a proxy (`grpc-web`) | Native |
-
-gRPC is a strong fit for internal service-to-service calls where both ends are under your control. It is a weaker fit for public APIs that need browser access or human-readable payloads.
-
-## The four kinds of RPC
-
-Every gRPC method is one of four shapes. This is the single most important thing to internalize:
-
-```proto
-// 1. Unary — one request, one response. Like a normal function call.
-rpc SayHello (HelloRequest) returns (HelloResponse);
-
-// 2. Server streaming — one request, many responses.
-rpc ListFeatures (Rectangle) returns (stream Feature);
-
-// 3. Client streaming — many requests, one response.
-rpc RecordRoute (stream Point) returns (RouteSummary);
-
-// 4. Bidirectional streaming — many requests, many responses, both sides
-//    read and write independently.
-rpc RouteChat (stream RouteNote) returns (stream RouteNote);
+```mermaid
+graph LR
+    ClientStub["gRPC Client Stub"] -- "HTTP/2 (Binary Protobuf Frames)" --> ServerHandler["gRPC Server Handler"]
+    ServerHandler -- "Metadata / Trailers + Protobuf" --> ClientStub
 ```
 
-Message ordering is guaranteed within an individual call. In a bidi stream, the two directions are independent — the server can write before it has read everything.
+### Key Pillars
+1. **Protocol Buffers (Protobuf)**: A language-neutral, platform-neutral binary serialization mechanism. Messages are serialized into compact byte sequences defined by tag numbers rather than key strings.
+2. **HTTP/2 Transport**:
+   - **Multiplexing**: Hundreds of concurrent RPCs share a single persistent TCP connection.
+   - **Binary Framing**: Separate HEADERS, DATA, and RST_STREAM frames.
+   - **Header Compression (HPACK)**: Drastically reduces header overhead on repeated calls.
+3. **The Four RPC Patterns**:
+   - **Unary RPC**: Single request $\rightarrow$ Single response.
+   - **Server Streaming RPC**: Single request $\rightarrow$ Continuous stream of responses.
+   - **Client Streaming RPC**: Continuous stream of requests $\rightarrow$ Single aggregated response.
+   - **Bidirectional Streaming RPC**: Concurrent, independent request and response streams.
 
-## Learning path
+---
 
-Work through these in order. Each step builds on the last, and the status column is my own progress tracker.
+## 3. gRPC vs REST / JSON
 
-| # | Topic | What I learn | Status |
-|---|-------|--------------|--------|
-| 1 | **Hello World** | Define a service, generate code, run a server and client | Todo |
-| 2 | **Proto3 basics** | Scalar types, `repeated`, `map`, `oneof`, `optional`, field evolution rules | Todo |
-| 3 | **Server streaming** | `returns (stream ...)`, reading a server-sent sequence | Todo |
-| 4 | **Client streaming** | `rpc ... (stream ...)`, writing a request sequence | Todo |
-| 5 | **Bidirectional streaming** | Read/write concurrency, backpressure, flow control | Todo |
-| 6 | **Deadlines & cancellation** | `deadline` option, `DEADLINE_EXCEEDED`, aborting in-flight calls | Todo |
-| 7 | **Metadata** | Request/response headers, auth tokens, custom key-value pairs | Todo |
-| 8 | **Error handling** | gRPC status codes, `grpc.ServiceError`, rich error details | Todo |
-| 9 | **Interceptors** | Cross-cutting middleware on client and server | Todo |
-| 10 | **Security** | TLS, per-RPC credentials, mTLS | Todo |
-| 11 | **Reflection & tooling** | `grpcurl`, server reflection, `buf` lint and breaking-change detection | Todo |
+| Dimension | gRPC | REST / JSON |
+| :--- | :--- | :--- |
+| **Protocol** | HTTP/2 (Mandatory) | HTTP/1.1 or HTTP/2 |
+| **Data Format** | Binary Protocol Buffers (Strict schema) | Textual JSON (Loose or OpenAPI schema) |
+| **Streaming** | Native 4-way streaming over 1 TCP connection | Unidirectional SSE or separate WebSockets |
+| **Contract** | First-class `.proto` source of truth | Secondary OpenAPI / Swagger documents |
+| **Performance** | Extremely high throughput, low latency & CPU | Higher serialization overhead and bandwidth |
+| **Call Semantics** | Native Deadlines, Trailers, Cancellation | Custom headers, hand-rolled timeout logic |
+| **Browser Support** | Requires Envoy proxy / `grpc-web` | Universally supported by browser `fetch` |
+| **Ideal For** | High-throughput internal microservices | Public APIs, mobile Web frontends |
 
-A step only counts as done when I can answer its questions in [Questions I want to answer](#questions-i-want-to-answer) from memory — not from the code.
+---
 
-## How I work through a step
+## 4. Architecture & Request Flow
 
-Every example lives in `examples/<NN>-<topic>/` and follows the same four-part loop.
+```mermaid
+flowchart TD
+    subgraph ClientProcess ["Client Application"]
+        ClientApp["Client Code"] --> LoggingInterceptor["Logging Interceptor"]
+        LoggingInterceptor --> AuthInterceptor["Auth Interceptor (Bearer JWT)"]
+        AuthInterceptor --> gRPCStub["gRPC Client Stub"]
+    end
 
-**1. Read the contract first.** Before writing any JavaScript, read the `.proto` and say out loud what the server is allowed to do. If I can't describe the contract in plain words, the code won't clarify it later.
+    subgraph Wire ["HTTP/2 Connection"]
+        gRPCStub ==>|HEADERS (Authorization, Tracing)| HTTP2Transport["TCP / TLS Socket"]
+        HTTP2Transport ==>|DATA (Protobuf Payload)| ServerRuntime["gRPC Server Engine"]
+    end
 
-**2. Build the smallest thing that works.** One service, one method, no extras. The quick start below is the template — copy it, then change it.
-
-**3. Break it on purpose.** This is the part that actually teaches. Every example carries a short "break it" list of things to get wrong on purpose and watch: kill the server mid-call, send a malformed payload, set a 1 ms deadline, call a method that does not exist. The status code and error message that come back go straight into the notes.
-
-**4. Write down what surprised me.** In `notes/<NN>-<topic>.md` — what I expected, what actually happened, and the one thing I would have gotten wrong without running it. This is the artifact that makes the repo worth keeping.
-
-A worked example of the note format:
-
-```markdown
-# 07 - Metadata
-
-## What I expected
-Missing header -> server throws -> client sees INTERNAL.
-
-## What actually happened
-`metadata.get('authorization')` returned `[]`, and `[]` is truthy, so the
-`if (!auth)` guard never fired. The guard threw instead, and the client got
-UNKNOWN (2) rather than UNAUTHENTICATED (16).
-
-## The thing I'd have gotten wrong
-Falsy-checking an array of header values. Now: `auth?.[0]?.startsWith(...)`.
+    subgraph ServerProcess ["Server Application"]
+        ServerRuntime --> HealthCheck["grpc.health.v1.Health"]
+        ServerRuntime --> Reflection["grpc.reflection.v1alpha"]
+        ServerRuntime --> MethodHandler["Business Method Handler"]
+        MethodHandler --> DataStore["Repository / In-Memory DB"]
+    end
 ```
 
-## Quick start
+---
 
-The examples target **Node.js** with the pure-JavaScript `@grpc/grpc-js` implementation (no native compilation required).
-
-### Prerequisites
-
-- **Node.js 18 or newer** — check with `node --version`
-- **npm 9 or newer** — ships with Node
-
-### 1. Install the dependencies
-
-The quick start is learning-path step 1, so it lives in `examples/01-hello-world/`. Work there:
-
-```bash
-mkdir -p examples/01-hello-world/proto examples/01-hello-world/src
-cd examples/01-hello-world
-npm init -y
-npm install @grpc/grpc-js @grpc/proto-loader @grpc/reflection
-```
-
-| Package | Purpose |
-|---|---|
-| `@grpc/grpc-js` | The gRPC runtime for Node.js |
-| `@grpc/proto-loader` | Loads `.proto` files at runtime (dynamic code generation) |
-| `@grpc/reflection` | Server reflection, so `grpcurl` can discover services |
-
-### 2. Define the service
-
-Create `examples/01-hello-world/proto/helloworld.proto`:
-
-```proto
-syntax = "proto3";
-
-package helloworld;
-
-// The greeting service definition.
-service Greeter {
-  // Sends a greeting.
-  rpc SayHello (HelloRequest) returns (HelloReply) {}
-}
-
-// The request message containing the user's name.
-message HelloRequest {
-  string name = 1;
-}
-
-// The response message containing the greetings.
-message HelloReply {
-  string message = 1;
-}
-```
-
-Note the field numbers (`= 1`, `= 2`). They are the wire format's identity, not array indices — never renumber an existing field, and never reuse a number you've deleted.
-
-### 3. Write the server
-
-Create `examples/01-hello-world/src/server.js`:
-
-```js
-const path = require('node:path');
-const grpc = require('@grpc/grpc-js');
-const protoLoader = require('@grpc/proto-loader');
-const { ReflectionService } = require('@grpc/reflection');
-
-const PROTO_PATH = path.join(__dirname, '..', 'proto', 'helloworld.proto');
-
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
-const proto = grpc.loadPackageDefinition(packageDefinition).helloworld;
-
-function sayHello(call, callback) {
-  callback(null, { message: `Hello ${call.request.name}` });
-}
-
-const server = new grpc.Server();
-server.addService(proto.Greeter.service, { sayHello });
-
-const reflection = new ReflectionService(proto);
-reflection.addToServer(server);
-
-const PORT = process.env.PORT || '50051';
-server.bindAsync(`0.0.0.0:${PORT}`, grpc.ServerCredentials.createInsecure(), (err, port) => {
-  if (err) {
-    console.error('Failed to start server:', err);
-    process.exit(1);
-  }
-  console.log(`Server listening on 0.0.0.0:${port}`);
-});
-```
-
-The `protoLoader.loadSync` options control how protobuf values map to JavaScript. `keepCase: true` preserves `snake_case` field names as written in the `.proto` file instead of converting them to `camelCase` — it keeps the JavaScript side matching the contract.
-
-### 4. Write the client
-
-Create `examples/01-hello-world/src/client.js`:
-
-```js
-const path = require('node:path');
-const grpc = require('@grpc/grpc-js');
-const protoLoader = require('@grpc/proto-loader');
-
-const PROTO_PATH = path.join(__dirname, '..', 'proto', 'helloworld.proto');
-
-const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-  keepCase: true,
-  longs: String,
-  enums: String,
-  defaults: true,
-  oneofs: true,
-});
-const proto = grpc.loadPackageDefinition(packageDefinition).helloworld;
-
-const client = new proto.Greeter(`127.0.0.1:${process.env.PORT || '50051'}`, grpc.credentials.createInsecure());
-
-const name = process.argv[2] || 'world';
-
-client.sayHello({ name }, (err, response) => {
-  if (err) {
-    console.error('RPC failed:', err.message);
-    process.exit(1);
-  }
-  console.log('Greeting:', response.message);
-  client.close();
-});
-```
-
-### 5. Run it
-
-Open two terminals, both inside `examples/01-hello-world/`:
-
-```bash
-# Terminal 1
-node src/server.js
-# Server listening on 0.0.0.0:50051
-
-# Terminal 2
-node src/client.js Alice
-# Greeting: Hello Alice
-```
-
-### 6. Call it with grpcurl
-
-[`grpcurl`](https://github.com/fullstorydev/grpcurl) is a `curl` for gRPC. Because the server registers the reflection service, it can discover the schema at runtime — no `.proto` file needed on the client side.
-
-```bash
-# List the services the server exposes
-grpcurl -plaintext 127.0.0.1:50051 list
-# helloworld.Greeter
-
-# Inspect the service definition
-grpcurl -plaintext 127.0.0.1:50051 describe helloworld.Greeter
-# service Greeter {
-#   rpc SayHello ( .helloworld.HelloRequest ) returns ( .helloworld.HelloReply );
-# }
-
-# Invoke the method
-grpcurl -plaintext -d '{"name":"Bob"}' 127.0.0.1:50051 helloworld.Greeter/SayHello
-# {
-#   "message": "Hello Bob"
-# }
-```
-
-Without reflection enabled, pass the contract instead:
-
-```bash
-grpcurl -plaintext -proto proto/helloworld.proto \
-  -d '{"name":"Bob"}' 127.0.0.1:50051 helloworld.Greeter/SayHello
-```
-
-## Tooling reference
-
-### protoc — the Protocol Buffers compiler
-
-Install it from the [protobuf releases page](https://github.com/protocolbuffers/protobuf/releases) and make sure `protoc` is on your `PATH`.
-
-```bash
-protoc --version
-# libprotoc 36.2
-```
-
-### Code generation: dynamic vs. static
-
-Node.js gRPC has two ways to turn a `.proto` into code, and they are genuinely different tools.
-
-**Dynamic** (what the quick start uses) — `@grpc/proto-loader` parses the `.proto` at runtime. No build step, no generated files in the repo, and the contract can change without regenerating anything. This is the recommended default for learning and for most Node.js services.
-
-**Static** — `protoc` emits real `.js` files that you import. Faster at runtime and gives you a typed API without a load-time parse, at the cost of a codegen step in your build.
-
-For static generation you need three pieces that must agree on the `google-protobuf` runtime version:
-
-```bash
-npm install @grpc/grpc-js google-protobuf@4.0.3
-npm install --save-dev protoc-gen-js@4.0.3 protoc-gen-grpc-js@0.4.0
-```
-
-`protoc-gen-grpc-js` declares a peer dependency on `google-protobuf@^3.14.0`, so npm may need `--legacy-peer-deps` to install it alongside `google-protobuf@4`. A version mismatch between the generated code and the runtime shows up as `Error deserializing request` at call time, not at build time — so keep the pair pinned.
-
-Then generate, pointing `protoc` at both plugins explicitly:
-
-```bash
-protoc \
-  --plugin=protoc-gen-grpc=node_modules/.bin/protoc-gen-grpc-js \
-  --plugin=protoc-gen-js=node_modules/.bin/protoc-gen-js \
-  --js_out=import_style=commonjs,binary:./src/generated \
-  --grpc_out=grpc_js:./src/generated \
-  -I ./proto ./proto/helloworld.proto
-```
-
-This produces `src/generated/helloworld_pb.js` and `src/generated/helloworld_grpc_pb.js`. Import them like any other module:
-
-```js
-const grpc = require('@grpc/grpc-js');
-const { HelloRequest } = require('./generated/helloworld_pb');
-const { GreeterClient } = require('./generated/helloworld_grpc_pb');
-
-const client = new GreeterClient('127.0.0.1:50051', grpc.credentials.createInsecure());
-
-const request = new HelloRequest();
-request.setName('Alice');
-
-client.sayHello(request, (err, response) => {
-  if (err) {
-    console.error('RPC failed:', err.message);
-    process.exit(1);
-  }
-  console.log('Greeting:', response.getMessage());
-  client.close();
-});
-```
-
-Note the difference in style: with static generation you build a message with `new HelloRequest()` and `setName()`, and you read it back with `getMessage()`. With dynamic generation you pass and receive plain objects.
-
-Generated files are git-ignored in this repository — regenerate them locally rather than committing them.
-
-### buf — a modern alternative to protoc
-
-[`buf`](https://buf.build) is a protobuf toolchain that adds linting, breaking-change detection, and a managed registry.
-
-```bash
-# Install
-brew install bufbuild/buf/buf        # macOS
-# or download a release binary from https://github.com/bufbuild/buf/releases
-
-buf --version
-# 1.75.0
-```
-
-Useful commands once you have a `buf.yaml`:
-
-```bash
-buf lint          # enforce style rules
-buf breaking --against '.git#branch=main'   # catch incompatible changes
-buf generate      # generate code from buf.gen.yaml
-```
-
-### grpcurl — the command-line client
-
-```bash
-brew install grpcurl                  # macOS
-# or: go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
-```
-
-Useful flags:
-
-| Flag | Purpose |
-|---|---|
-| `-plaintext` | Connect without TLS (local development only) |
-| `-d '{"name":"Bob"}'` | Send a JSON request body |
-| `-proto <file>` | Use a local `.proto` when reflection is off |
-| `-format json\|text` | Response output format |
-| `-max-time <secs>` | Client-side deadline in seconds |
-
-## Core concepts
-
-### Deadlines and cancellation
-
-Every call can carry a deadline. When it passes, the call is cancelled and the server sees the context abort. This is how you avoid leaking a hung request forever.
-
-```js
-const deadline = new Date(Date.now() + 3000); // 3 seconds from now
-client.sayHello({ name: 'Alice' }, { deadline }, (err, response) => {
-  if (err) {
-    console.error(err.code, err.details); // 4 = DEADLINE_EXCEEDED
-    return;
-  }
-  console.log(response.message);
-});
-```
-
-The server sees the deadline too, and can check `call.metadata` and abort early rather than doing work nobody will read.
-
-### Metadata
-
-Metadata is the gRPC equivalent of HTTP headers: a set of key-value pairs sent with a call.
-
-```js
-// Client: attach an auth token
-const metadata = new grpc.Metadata();
-metadata.set('authorization', 'Bearer ' + token);
-
-client.sayHello({ name: 'Alice' }, metadata, (err, response) => { /* ... */ });
-```
-
-```js
-// Server: read it inside the handler
-function sayHello(call, callback) {
-  const auth = call.metadata.get('authorization');
-  if (!auth?.[0]?.startsWith('Bearer ')) {
-    callback({ code: grpc.status.UNAUTHENTICATED, details: 'Missing token' });
-    return;
-  }
-  callback(null, { message: `Hello ${call.request.name}` });
-}
-```
-
-`metadata.get()` returns an **array** of values, and an empty array is truthy — so `!auth` does not detect a missing header. Use optional chaining (`auth?.[0]?....`) to check the first value safely.
-
-Metadata keys are lowercase, and values are always strings (or buffers).
-
-### Error handling
-
-Errors are reported with a numeric **status code**, not an HTTP status. The important ones:
-
-| Code | Name | Meaning |
-|---|---|---|
-| 0 | `OK` | Success |
-| 3 | `INVALID_ARGUMENT` | The client sent something malformed |
-| 5 | `NOT_FOUND` | The requested entity does not exist |
-| 7 | `PERMISSION_DENIED` | The caller is not allowed to do this |
-| 8 | `RESOURCE_EXHAUSTED` | A quota or rate limit was hit |
-| 9 | `FAILED_PRECONDITION` | The system is not in a state that allows this |
-| 12 | `UNIMPLEMENTED` | The method does not exist on this server |
-| 13 | `INTERNAL` | Something broke on the server |
-| 14 | `UNAVAILABLE` | The server could not be reached — retry may help |
-| 4 | `DEADLINE_EXCEEDED` | The deadline passed |
-| 1 | `CANCELLED` | The call was cancelled |
-
-On the server, pass a structured error to the callback:
-
-```js
-callback({
-  code: grpc.status.NOT_FOUND,
-  details: `No user with id ${call.request.id}`,
-});
-```
-
-On the client, the error is an object with a `code` (number), `details` (string), and `metadata`. In TypeScript it is typed as `grpc.ServiceError`; note that this is a type-only export, so `err instanceof grpc.ServiceError` does not work at runtime — compare `err.code` against `grpc.status.*` instead.
-
-The distinction between `INVALID_ARGUMENT` (the request is wrong, don't retry) and `UNAVAILABLE` (the server is down, retry) is the one that matters most in practice.
-
-### Interceptors
-
-Interceptors are middleware. A server interceptor receives the method descriptor and the call, and returns a wrapped call built from a listener and a responder:
-
-```js
-function loggingInterceptor(methodDescriptor, call) {
-  const started = Date.now();
-
-  const listener = new grpc.ServerListenerBuilder()
-    .withOnReceiveMessage((message, next) => {
-      console.log(`server received: ${JSON.stringify(message)}`);
-      next(message);
-    })
-    .build();
-
-  const responder = new grpc.ResponderBuilder()
-    .withStart(next => {
-      next(listener);
-    })
-    .withSendMessage((message, next) => {
-      console.log(`call took ${Date.now() - started}ms`);
-      next(message);
-    })
-    .build();
-
-  return new grpc.ServerInterceptingCall(call, responder);
-}
-
-const server = new grpc.Server({ interceptors: [loggingInterceptor] });
-```
-
-The `ServerListenerBuilder` intercepts what the server *receives*; the `ResponderBuilder` intercepts what it *sends*. Each `next(...)` call passes control along — forgetting it stalls the call.
-
-Client interceptors use a different set of builders — `RequesterBuilder` for what the client sends, `ListenerBuilder` for what it receives:
-
-```js
-function authInterceptor(options, nextCall) {
-  const requester = new grpc.RequesterBuilder()
-    .withStart((metadata, listener, next) => {
-      metadata.set('authorization', 'Bearer some-secret-token');
-      next(metadata, listener);
-    })
-    .build();
-  return new grpc.InterceptingCall(nextCall(options), requester);
-}
-
-const client = new proto.Greeter('127.0.0.1:50051', grpc.credentials.createInsecure(), {
-  interceptors: [authInterceptor],
-});
-```
-
-This is the natural place to attach an auth token to every outgoing call without threading it through the call sites.
-
-## Questions I want to answer
-
-These are the questions each example is supposed to make me able to answer. If I cannot answer one from memory, the example is not finished — and if I cannot answer it by reading the code either, that is a gap in the README I should fill in.
-
-**The contract**
-
-- What does the `.proto` file give me that a REST route does not?
-- Where does the contract end and the implementation begin?
-- Why does a unary call look like a function call but travel over HTTP/2?
-
-**Streaming**
-
-- When would I pick server streaming over a paginated unary API?
-- In a bidirectional stream, who decides how fast each side reads?
-- What happens to messages already in flight when the client disconnects?
-
-**Deadlines and errors**
-
-- What does the server see when a deadline passes mid-handler?
-- Which status codes mean "retry" and which mean "do not retry"?
-- Why is `INVALID_ARGUMENT` a client bug while `UNAVAILABLE` is a server problem?
-
-**Wiring**
-
-- How do I attach an auth token to every call without touching every call site?
-- Where do I put logging so it captures each call exactly once?
-- What changes if the same `.proto` is served by a Go backend and called from Node?
-
-**The wire**
-
-- What bytes actually travel for a unary call? (Look at the HTTP/2 frames, not just the protobuf.)
-- How do I turn on message compression, and does it pay off for small messages?
-- What does a deadline look like in the request headers?
-
-## Repository layout
+## 5. Repository Layout
 
 ```
 GRPC-Learning/
-├── examples/         # one directory per learning-path step
-│   └── 01-hello-world/
-│       ├── proto/    # the contract for this example
-│       ├── src/      # server and client
-│       └── README.md # what it shows, and how to break it
-├── notes/            # what I learned, in my own words
-│   └── 01-hello-world.md
-├── proto/            # shared contracts, for when an example outgrows one file
-├── tools/            # helper scripts (codegen, formatting, linting)
-└── README.md
+├── .github/workflows/ci.yml       # GitHub Actions CI matrix
+├── docker/
+│   ├── Dockerfile                 # Node.js Alpine production container
+│   └── docker-compose.yml         # Multi-service cluster topology
+├── docs/
+│   ├── architecture.md            # Deep architecture & HTTP/2 framing
+│   ├── troubleshooting.md         # Status codes & debug playbooks
+│   ├── glossary.md                # gRPC & distributed systems glossary
+│   └── learning-roadmap.md        # 4-stage mastery guide
+├── lessons/
+│   ├── 01-grpc-fundamentals/      # Hello World & core mechanics
+│   ├── 02-protocol-buffers/       # Wire types, enums, oneof, evolution
+│   ├── 03-unary-rpc/              # Complete UserService with CRUD
+│   ├── 04-server-streaming/       # Live notification push stream
+│   ├── 05-client-streaming/       # High-frequency sensor ingestion
+│   ├── 06-bidirectional-streaming/# Real-time duplex chat room
+│   ├── 07-deadlines-and-timeouts/ # Deadlines, timeouts & abort handling
+│   ├── 08-error-handling/         # Standard error catalog & status codes
+│   ├── 09-metadata-and-interceptors/ # Tracing headers & client interceptors
+│   ├── 10-authentication-and-authorization/ # JWT metadata authentication
+│   ├── 11-tls-and-security/       # X.509 TLS certificate generation & mTLS
+│   ├── 12-cancellation-and-retries/ # Exponential backoff with jitter
+│   ├── 13-health-checking/        # grpc.health.v1 implementation
+│   ├── 14-reflection-and-debugging/ # Dynamic server reflection & grpcurl
+│   ├── 15-load-balancing/         # Multi-backend round-robin balancing
+│   ├── 16-rest-vs-grpc/           # Express vs gRPC performance benchmark
+│   ├── 17-database-integration/   # Relational entity store & pagination
+│   ├── 18-microservices/          # grpc-commerce-demo 3-tier cluster
+│   ├── 19-testing/                # Ephemeral port testing strategies
+│   ├── 20-docker-and-deployment/  # Docker & Kubernetes readiness guide
+│   └── 21-production-best-practices/ # Production hardened server template
+├── proto/                         # Strict Protocol Buffer contracts
+├── src/                           # Shared runtime utilities & interceptors
+├── tests/                         # 21 Jest automated test suites
+├── scripts/check-protos.js        # Protobuf schema syntax validator
+└── package.json                   # CommonJS npm scripts & configuration
 ```
 
-### Conventions
+---
 
-- **One `.proto` per example**, in that example's own `proto/` directory — contracts should be readable in isolation.
-- **Every example has a `README.md`** with three parts: what it demonstrates, how to run it, and a "break it" list of deliberate mistakes to try.
-- **Every example has a matching note** in `notes/`, even if it is one line. Especially if it is one line.
-- **Generated code is never committed.** Run the codegen command; the output is git-ignored.
-- **Pin your `google-protobuf` version** in `package.json` if you use static code generation.
+## 6. Prerequisites & Installation
 
-## Troubleshooting
+### Prerequisites
+- **Node.js**: LTS version (v18.0.0 or higher) — check with `node -v`
+- **npm**: v9.0.0 or higher — check with `npm -v`
 
-**`EADDRNOTAVAIL` or the client can't reach the server**
+### Installation
+Clone the repository and install all dependencies:
+```bash
+git clone https://github.com/Ankitmohanty2/GRPC-Learning.git
+cd GRPC-Learning
+npm install
+```
 
-Check that the server is actually listening, and that the client and server agree on the port. If your environment sets `PORT` to `0`, the server binds to a random port and your client's `50051` will never match — start the server with an explicit `PORT=50051`.
+---
 
-**`Error deserializing request` (static codegen)**
+## 7. Running Your First Example
 
-A version mismatch between the generated code and the `google-protobuf` runtime. Reinstall so that `protoc-gen-js`, `protoc-gen-grpc-js`, and `google-protobuf` all agree, then regenerate.
+Start the Hello World gRPC server in your first terminal:
+```bash
+npm run lesson:01:server
+```
 
-**`protoc-gen-grpc: program not found`**
+In a second terminal, invoke the client:
+```bash
+npm run lesson:01:client Alice
+```
 
-`protoc` looks for plugins on your `PATH`. Either add `node_modules/.bin` to `PATH`, or pass `--plugin=protoc-gen-grpc=node_modules/.bin/protoc-gen-grpc-js` explicitly.
+Expected Output:
+```
+🎉 Server says: Hello, Alice!
+```
 
-**`Failed to start server: listen EADDRINUSE`**
+---
 
-Another process holds the port. Find it with `lsof -i :50051` (macOS/Linux) or `netstat -ano | findstr :50051` (Windows), and stop it. Note that gRPC enables `SO_REUSEPORT`, so a stale server may silently share the port with a new one and produce confusing half-working behavior.
+## 8. Lesson Index & Execution Commands
 
-**`Cannot find module 'google-protobuf'`**
+| # | Lesson Topic | Server Command | Client / Demo Command |
+|---|:---|:---|:---|
+| 01 | **gRPC Fundamentals** | `npm run lesson:01:server` | `npm run lesson:01:client` |
+| 02 | **Protocol Buffers** | `npm run lesson:02:server` | `npm run lesson:02:client` |
+| 03 | **Unary RPC** | `npm run lesson:03:server` | `npm run lesson:03:client` |
+| 04 | **Server Streaming** | `npm run lesson:04:server` | `npm run lesson:04:client` |
+| 05 | **Client Streaming** | `npm run lesson:05:server` | `npm run lesson:05:client` |
+| 06 | **Bidirectional Streaming**| `npm run lesson:06:server` | `npm run lesson:06:client` |
+| 07 | **Deadlines & Timeouts** | `npm run lesson:07:server` | `npm run lesson:07:client` |
+| 08 | **Error Handling** | `npm run lesson:08:server` | `npm run lesson:08:client` |
+| 09 | **Metadata & Interceptors**| `npm run lesson:09:server` | `npm run lesson:09:client` |
+| 10 | **Authentication (JWT)** | `npm run lesson:10:server` | `npm run lesson:10:client` |
+| 11 | **TLS & Encryption** | `npm run lesson:11:server` | `npm run lesson:11:client` |
+| 12 | **Cancellation & Retries** | `npm run lesson:12:server` | `npm run lesson:12:client` |
+| 13 | **Health Checking** | `npm run lesson:13:server` | `npm run lesson:13:client` |
+| 14 | **Server Reflection** | — | `npm run lesson:14:demo` |
+| 15 | **Load Balancing** | — | `npm run lesson:15:demo` |
+| 16 | **REST vs gRPC Benchmark** | — | `npm run lesson:16:compare` |
+| 17 | **Database Integration** | — | `npm run lesson:17:demo` |
+| 18 | **Microservices Cluster** | `npm run microservices:start` | `npm run microservices:client` |
+| 19 | **Programmatic Testing** | — | `node lessons/19-testing/demo.js` |
+| 20 | **Docker Deployment** | `npm run docker:up` | `npm run docker:down` |
+| 21 | **Production Server** | `node lessons/21-production-best-practices/production-server.js` | — |
 
-The static runtime is a separate package. Install it: `npm install google-protobuf@4.0.3`.
+---
 
-**`grpcurl` says "server does not support the reflection service"**
+## 9. Debugging with grpcurl
 
-You did not register the reflection service, or you are using a server started without it. Either add the `@grpc/reflection` setup from the quick start, or pass `-proto proto/helloworld.proto` to `grpcurl`.
+`grpcurl` is the `curl` equivalent for gRPC servers that expose Server Reflection:
 
-## Resources
+### 1. List Available Services
+```bash
+grpcurl -plaintext 127.0.0.1:50051 list
+```
+Output:
+```
+grpc.health.v1.Health
+grpc.reflection.v1alpha.ServerReflection
+helloworld.Greeter
+```
 
-- [gRPC documentation](https://grpc.io/docs/) — the official starting point
-- [gRPC core concepts](https://grpc.io/docs/what-is-grpc/core-concepts/) — service definition, RPC lifecycle
-- [gRPC Node basics tutorial](https://grpc.io/docs/languages/node/basics/) — the dynamic codegen path in detail
-- [Protocol Buffers language guide](https://protobuf.dev/programming-guides/proto3/) — the `proto3` reference
-- [`@grpc/grpc-js`](https://github.com/grpc/grpc-node) — the Node.js implementation
-- [`grpcurl`](https://github.com/fullstorydev/grpcurl) — command-line gRPC client
-- [`buf`](https://buf.build/docs) — linting, breaking-change detection, and a protobuf registry
-- [Google API design guide](https://google.aip.dev) — conventions worth following for any RPC API
+### 2. Describe a Specific Service Contract
+```bash
+grpcurl -plaintext 127.0.0.1:50051 describe helloworld.Greeter
+```
 
-## Notes for future me
+### 3. Invoke a Remote Procedure Call Directly
+```bash
+grpcurl -plaintext -d '{"name": "DevOps"}' 127.0.0.1:50051 helloworld.Greeter/SayHello
+```
+Output:
+```json
+{
+  "message": "Hello, DevOps!"
+}
+```
 
-Things worth remembering when I come back to this repo in six months.
+---
 
-- **The contract is the API.** Changing a `.proto` changes the wire format. Adding a field is safe; renumbering a field or reusing a deleted one is not.
-- **Errors are status codes, not exceptions.** `INVALID_ARGUMENT` means my client is wrong. `UNAVAILABLE` means retry. Anything else needs reading.
-- **A missing header is not `undefined`.** `metadata.get()` returns an array, and an empty array is truthy. Use `auth?.[0]?.…`.
-- **A deadline is not a timeout.** The server sees the cancellation too — it should stop working, not just have its response dropped.
-- **`SO_REUSEPORT` is on.** A stale server can share port 50051 with a new one, so "it half works" is usually a leftover process, not a bug in the code.
-- **Generated code is disposable.** If a `.proto` change does not show up, regenerate before debugging anything else.
-- **When something confuses me, it goes in the README.** Fixing it for me is worth less than writing it down so the same confusion never happens twice.
+## 10. Integrated Microservices Project (grpc-commerce-demo)
 
-If I extend this repo, the loop stays the same: build it small, break it on purpose, write it down.
+Lesson 18 contains a distributed e-commerce workflow orchestrating three microservices:
+1. **User Service** (`:50051`): Identity and account verification.
+2. **Product Service** (`:50052`): Catalog and stock validation.
+3. **Order Service** (`:50053`): Order placement, downstream orchestration, and idempotency deduplication.
+
+### Run the Cluster:
+```bash
+npm run microservices:start
+```
+In another terminal, trigger the client flow:
+```bash
+npm run microservices:client
+```
+
+---
+
+## 11. Automated Testing Suite
+
+Automated testing is powered by **Jest** with dynamic ephemeral port binding (`127.0.0.1:0`), ensuring tests never collide on TCP sockets.
+
+### Run All 21 Test Suites:
+```bash
+npm test
+```
+
+### Validate Protocol Buffer Schemas:
+```bash
+npm run proto:check
+```
+
+### Run ESLint Code Quality:
+```bash
+npm run lint
+```
+
+---
+
+## 12. Docker & Containerized Deployment
+
+Run the complete microservices cluster in Docker Compose:
+```bash
+npm run docker:up
+```
+
+View active container logs:
+```bash
+docker compose -f docker/docker-compose.yml logs -f
+```
+
+Tear down containers:
+```bash
+npm run docker:down
+```
+
+---
+
+## 13. Troubleshooting & Gotchas
+
+1. **`14 UNAVAILABLE: No connection established`**:
+   - The server was not listening when the client connected. Ensure the server is bound before calling RPCs.
+2. **`4 DEADLINE_EXCEEDED`**:
+   - The RPC handler did not complete within the requested time window (`deadline: Date.now() + ms`).
+3. **`12 UNIMPLEMENTED: Method not found`**:
+   - Case sensitivity mismatch between `.proto` definition and the JavaScript implementation object.
+4. **Port Collisions in Tests (`EADDRINUSE`)**:
+   - Always bind to port `0` (`127.0.0.1:0`) in tests so the operating system allocates a free ephemeral port.
+5. **Open Handles / Hang on Exit**:
+   - gRPC HTTP/2 connections stay open indefinitely unless closed. Always invoke `client.close()` and `server.tryShutdown()` in cleanup hooks.
+
+---
+
+## 14. Learning Roadmap
+
+Check out the full four-stage curriculum in [docs/learning-roadmap.md](docs/learning-roadmap.md):
+- **Stage 1: Fundamentals & Protocol Buffers** (Lessons 01–03)
+- **Stage 2: Streaming Patterns & Backpressure** (Lessons 04–06)
+- **Stage 3: Reliability, Security & Observability** (Lessons 07–15)
+- **Stage 4: Enterprise Microservices & Operations** (Lessons 16–21)
+
+---
+
+## 15. Interview Questions & Deep-Dive Answers
+
+<details>
+<summary><b>1. Why does gRPC use HTTP/2 instead of HTTP/1.1?</b></summary>
+HTTP/1.1 suffers from Head-of-Line (HoL) blocking at the application layer: each request must wait for the preceding response before the connection can be reused (unless multiple TCP connections are opened). HTTP/2 introduces binary framing and multiplexed bidirectional streams over a single TCP connection, allowing concurrent requests and responses without connection overhead.
+</details>
+
+<details>
+<summary><b>2. Why can't you change a Protobuf field number after publication?</b></summary>
+Protobuf does not transmit field names over the wire; it encodes the tag number and wire type. Changing tag number `1` to `2` causes deserializers to map incoming bytes to the wrong field or treat them as unknown fields, breaking backward and forward compatibility.
+</details>
+
+<details>
+<summary><b>3. What is the difference between gRPC Metadata and Trailers?</b></summary>
+Metadata sent as initial headers is delivered before any response message payloads are sent. Trailers are sent at the very end of the stream after all response messages are delivered, carrying the final status code (e.g., `grpc-status: 0`) and trailing metrics.
+</details>
+
+<details>
+<summary><b>4. How does gRPC handle Load Balancing?</b></summary>
+Because gRPC holds persistent HTTP/2 connections, traditional Layer 4 (TCP) load balancers will route all traffic to a single backend pod. Solutions include:
+1. **Client-Side Load Balancing**: The client discovers all backend IPs via DNS/Consul and distributes RPC calls across multiple subchannels.
+2. **Layer 7 Proxy Load Balancing**: An intermediary proxy like Envoy terminates HTTP/2 and routes individual RPC requests across backend instances.
+</details>
+
+---
+
+## 16. Hands-On Exercises & Solutions
+
+1. **Exercise 1: Add Address Book Search** (Lesson 03)
+   - *Task*: Extend `users.proto` with a `SearchUsers(UserFilter)` unary RPC returning `repeated User`.
+   - *Solution*: Filter the `userRepository` collection by regex match against `name` and `email`.
+2. **Exercise 2: Dynamic Notification Throttling** (Lesson 04)
+   - *Task*: Implement client-side rate limiting on incoming server notifications.
+   - *Solution*: Pause the stream using `call.pause()` when the buffer threshold is reached, and resume with `call.resume()`.
+3. **Exercise 3: Retry Backoff with Jitter** (Lesson 12)
+   - *Task*: Add full decorrelated jitter to the retry interceptor to prevent the "thundering herd" problem.
+   - *Solution*: Calculate `delay = Math.min(maxDelay, Math.random() * (baseDelay * Math.pow(2, attempt)))`.
+
+---
+
+## 17. Glossary & References
+
+- Complete definitions are available in [docs/glossary.md](docs/glossary.md).
+- Architecture diagrams and flowcharts are detailed in [docs/architecture.md](docs/architecture.md).
+- Official gRPC Node.js Docs: [grpc.io/docs/languages/node](https://grpc.io/docs/languages/node/)
+- Protocol Buffers Language Guide: [protobuf.dev](https://protobuf.dev/)
+
+---
 
 ## License
 
-Released under the [MIT License](./LICENSE).
-
-Copyright &copy; 2026 Ankit Mohanty.
+MIT © Ankit Mohanty
