@@ -28,6 +28,7 @@ This repository combines a contract-first mental model with working implementati
 
 ---
 
+
 ## 1. Project Overview
 
 This repository is designed around an active learning loop:
