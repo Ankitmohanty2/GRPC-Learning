@@ -8,6 +8,7 @@ This repository combines a contract-first mental model with working implementati
 
 ## Table of Contents
 
+
 1. [Project Overview](#1-project-overview)
 2. [gRPC Fundamentals & Mental Model](#2-grpc-fundamentals--mental-model)
 3. [gRPC vs REST / JSON](#3-grpc-vs-rest--json)
